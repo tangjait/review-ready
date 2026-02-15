@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
-import { Clock, Users, TrendingUp, AlertTriangle } from "lucide-react";
-import type { DashboardStats } from "@/data/mockData";
+import { Clock, Users, TrendingUp, AlertTriangle, ClipboardCheck } from "lucide-react";
+import { getChecklistCompletion } from "@/components/ReviewChecklist";
+import type { DashboardStats, Employee } from "@/data/mockData";
 
 interface StatCardProps {
   icon: React.ReactNode;
@@ -35,39 +36,18 @@ function StatCard({ icon, label, value, sublabel, variant = "default", delay = 0
   );
 }
 
-export function StatsGrid({ stats }: { stats: DashboardStats }) {
+export function StatsGrid({ stats, employees }: { stats: DashboardStats; employees?: Employee[] }) {
+  const avgChecklist = employees
+    ? Math.round(employees.reduce((sum, e) => sum + getChecklistCompletion(e.checklist), 0) / employees.length)
+    : 0;
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatCard
-        icon={<Users size={20} />}
-        label="Reviews Completed"
-        value={`${stats.reviewsCompleted}/${stats.totalEmployees}`}
-        sublabel={`${stats.completionRate}% completion rate`}
-        delay={0}
-      />
-      <StatCard
-        icon={<Clock size={20} />}
-        label="Hours Saved"
-        value={`${stats.totalHoursSaved}h`}
-        sublabel={`~${stats.avgTimeSaved} min per review`}
-        variant="accent"
-        delay={0.1}
-      />
-      <StatCard
-        icon={<TrendingUp size={20} />}
-        label="Avg Time Saved"
-        value="87%"
-        sublabel="vs manual review prep"
-        delay={0.2}
-      />
-      <StatCard
-        icon={<AlertTriangle size={20} />}
-        label="At-Risk Employees"
-        value={stats.atRiskCount}
-        sublabel="Needs attention"
-        variant={stats.atRiskCount > 0 ? "warning" : "default"}
-        delay={0.3}
-      />
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <StatCard icon={<Users size={20} />} label="Reviews Completed" value={`${stats.reviewsCompleted}/${stats.totalEmployees}`} sublabel={`${stats.completionRate}% completion rate`} delay={0} />
+      <StatCard icon={<Clock size={20} />} label="Hours Saved" value={`${stats.totalHoursSaved}h`} sublabel={`~${stats.avgTimeSaved} min per review`} variant="accent" delay={0.1} />
+      <StatCard icon={<TrendingUp size={20} />} label="Avg Time Saved" value="87%" sublabel="vs manual review prep" delay={0.2} />
+      <StatCard icon={<AlertTriangle size={20} />} label="At-Risk Employees" value={stats.atRiskCount} sublabel="Needs attention" variant={stats.atRiskCount > 0 ? "warning" : "default"} delay={0.3} />
+      <StatCard icon={<ClipboardCheck size={20} />} label="Checklist Avg" value={`${avgChecklist}%`} sublabel="Review readiness" delay={0.4} />
     </div>
   );
 }
