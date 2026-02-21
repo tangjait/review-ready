@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Sparkles, Clock, Target, MessageSquare, GitPullRequest, Star, GitCompare } from "lucide-react";
@@ -11,8 +11,14 @@ import { ReviewChecklist } from "@/components/ReviewChecklist";
 import { ComparisonView } from "@/components/ComparisonView";
 import { ExportButtons } from "@/components/ExportButtons";
 import { ReviewHistory } from "@/components/ReviewHistory";
+import { FairnessScore } from "@/components/FairnessScore";
+import { BiasAssistant } from "@/components/BiasAssistant";
+import { CalibrationCheck } from "@/components/CalibrationCheck";
 import { usePersistedState } from "@/hooks/usePersistedState";
+import { detectWritingSuggestions, computeFairnessScore, getCalibrationResult } from "@/data/biasData";
 import type { Employee, ToneOption, SmartPromptsData, ChecklistState } from "@/data/mockData";
+import type { WritingSuggestion } from "@/data/biasData";
+import { toast } from "sonner";
 
 function MetricCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
@@ -38,6 +44,26 @@ export default function ReviewPage() {
   const [showComparison, setShowComparison] = useState(false);
   const [usedTone, setUsedTone] = useState<ToneOption | null>(null);
 
+  // Bias detection state
+  const [assistantOpen, setAssistantOpen] = useState(false);
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const [showCalibration, setShowCalibration] = useState(false);
+
+  const allText = useMemo(() => {
+    if (!employee) return "";
+    return [employee.aiSummary, ...employee.keyAccomplishments, ...employee.highlights, ...employee.areasForGrowth, managerNotes].join(" ");
+  }, [employee, managerNotes]);
+
+  const suggestions: WritingSuggestion[] = useMemo(() => {
+    if (!employee || !generated) return [];
+    return detectWritingSuggestions(allText, employee.name).map((s) => ({
+      ...s,
+      dismissed: dismissed.has(s.id),
+    }));
+  }, [allText, employee, generated, dismissed]);
+
+  const fairnessScore = useMemo(() => generated ? computeFairnessScore(allText) : 0, [allText, generated]);
+
   if (!employee) {
     return <div className="min-h-screen flex items-center justify-center"><p className="text-muted-foreground">Employee not found.</p></div>;
   }
@@ -48,6 +74,15 @@ export default function ReviewPage() {
     setTimeout(() => { setGenerating(false); setGenerated(true); }, 2500);
   };
 
+  const handleDismiss = (id: string) => setDismissed((prev) => new Set(prev).add(id));
+
+  const handleMarkComplete = () => setShowCalibration(true);
+  const handleCalibrationSubmit = () => {
+    setShowCalibration(false);
+    toast.success("Review submitted successfully");
+  };
+
+  const calibrationResult = getCalibrationResult(employee.id);
   const riskColors = { low: "text-success", medium: "text-primary", high: "text-destructive" };
 
   return (
@@ -59,7 +94,10 @@ export default function ReviewPage() {
             <button onClick={() => navigate("/")} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
               <ArrowLeft size={16} /> Back to Dashboard
             </button>
-            {generated && <ExportButtons employee={employee} managerNotes={managerNotes} />}
+            <div className="flex items-center gap-3">
+              {generated && <FairnessScore score={fairnessScore} />}
+              {generated && <ExportButtons employee={employee} managerNotes={managerNotes} />}
+            </div>
           </div>
 
           {/* Print header */}
@@ -137,13 +175,23 @@ export default function ReviewPage() {
               <span className="text-muted-foreground">· Generated in 12s (saved ~{employee.timeSavedMinutes} min)</span>
             </div>
 
+            {/* Bias Assistant */}
+            <div className="print:hidden">
+              <BiasAssistant
+                suggestions={suggestions}
+                onDismiss={handleDismiss}
+                open={assistantOpen}
+                onToggle={() => setAssistantOpen(!assistantOpen)}
+              />
+            </div>
+
             {/* Checklist (post-generation) */}
             <div className="print:hidden">
               <ReviewChecklist checklist={checklist} onChange={setChecklist} />
             </div>
 
             {/* Comparison toggle */}
-            <div className="print:hidden">
+            <div className="print:hidden flex items-center gap-2">
               <Button variant="outline" size="sm" onClick={() => setShowComparison(!showComparison)} className="border-border">
                 <GitCompare size={14} className="mr-1.5" />
                 {showComparison ? "Hide" : "Compare to Last Review"}
@@ -193,9 +241,24 @@ export default function ReviewPage() {
 
             {/* Review History */}
             <ReviewHistory history={employee.reviewHistory} />
+
+            {/* Mark Complete Button */}
+            <div className="print:hidden">
+              <Button onClick={handleMarkComplete} className="w-full h-12 bg-success text-success-foreground hover:bg-success/90 font-display font-semibold">
+                Mark Review as Complete
+              </Button>
+            </div>
           </motion.div>
         )}
       </div>
+
+      {/* Calibration Check Modal */}
+      <CalibrationCheck
+        open={showCalibration}
+        onClose={() => setShowCalibration(false)}
+        onSubmit={handleCalibrationSubmit}
+        result={calibrationResult}
+      />
     </div>
   );
 }

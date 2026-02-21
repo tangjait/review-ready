@@ -1,17 +1,21 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Target, BarChart3, BookOpen } from "lucide-react";
 import { StatsGrid } from "@/components/StatsGrid";
 import { EmployeeList } from "@/components/EmployeeList";
 import { SearchFilter } from "@/components/SearchFilter";
 import { BulkActions } from "@/components/BulkActions";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Button } from "@/components/ui/button";
 import { mockEmployees, mockDashboardStats } from "@/data/mockData";
+import { mockOrgCalibration } from "@/data/biasData";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import type { Employee } from "@/data/mockData";
 import { toast } from "sonner";
 
 const Index = () => {
+  const navigate = useNavigate();
   const [employees, setEmployees] = usePersistedState<Employee[]>("reviewprep-employees", mockEmployees);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -64,6 +68,8 @@ const Index = () => {
     toast.success("Selected reviews marked as completed");
   };
 
+  const org = mockOrgCalibration;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Nav Bar */}
@@ -76,7 +82,12 @@ const Index = () => {
             <h1 className="font-display text-lg font-bold text-foreground">ReviewPrep</h1>
             <span className="text-xs text-muted-foreground hidden sm:block">· Q4 2025 Cycle</span>
           </div>
-          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => navigate("/patterns")}>
+              <BarChart3 size={14} className="mr-1.5" /> My Patterns
+            </Button>
+            <ThemeToggle />
+          </div>
         </div>
       </nav>
 
@@ -108,6 +119,33 @@ const Index = () => {
         <div className="mb-6">
           <StatsGrid stats={stats} employees={employees} />
         </div>
+
+        {/* HR Calibration Card */}
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mb-6">
+          <div className="glass-card p-5 border-l-4 border-l-primary">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-lg bg-primary/15 text-primary mt-0.5">
+                  <Target size={18} />
+                </div>
+                <div>
+                  <h3 className="font-display font-semibold text-foreground flex items-center gap-2">
+                    Org-Wide Calibration Insights
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-info/15 text-info font-normal">HR</span>
+                  </h3>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
+                    <span>{org.biasPatterns.find((b) => b.type === "recency")?.occurrences} reviews flagged for recency bias</span>
+                    <span>{org.biasPatterns.find((b) => b.type === "inflation")?.managers} managers showing grade inflation</span>
+                    <span>{org.biasPatterns.find((b) => b.type === "gendered")?.occurrences} gendered language patterns</span>
+                  </div>
+                </div>
+              </div>
+              <Button variant="outline" size="sm" className="border-border shrink-0" onClick={() => navigate("/calibration")}>
+                <BookOpen size={14} className="mr-1.5" /> Full Report
+              </Button>
+            </div>
+          </div>
+        </motion.div>
 
         {/* Search & Filter */}
         <SearchFilter
